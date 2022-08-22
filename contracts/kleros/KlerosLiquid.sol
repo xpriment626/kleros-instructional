@@ -27,7 +27,6 @@ contract KlerosLiquid is TokenController, Arbitrator {
     // General
     enum Phase {
       staking, // Stake sum trees can be updated. Pass after `minStakingTime` passes and there is at least one dispute without jurors.
-      generating, // Waiting for a random number. Pass as soon as it is ready.
       drawing // Jurors can be drawn. Pass after all disputes have jurors or `maxDrawingTime` passes.
     }
 
@@ -195,7 +194,6 @@ contract KlerosLiquid is TokenController, Arbitrator {
     /** @dev Constructs the KlerosLiquid contract.
      *  @param _governor The governor's address.
      *  @param _pinakion The address of the token contract.
-     *  @param _RNGenerator The address of the RNG contract.
      *  @param _minStakingTime The minimum time that the staking phase should last.
      *  @param _maxDrawingTime The maximum time that the drawing phase should last.
      *  @param _hiddenVotes The `hiddenVotes` property value of the general court.
@@ -373,12 +371,6 @@ contract KlerosLiquid is TokenController, Arbitrator {
         if (phase == Phase.staking) {
             require(now - lastPhaseChange >= minStakingTime, "The minimum staking time has not passed yet.");
             require(disputesWithoutJurors > 0, "There are no disputes that need jurors.");
-            RNBlock = block.number + 1;
-            RNGenerator.requestRN(RNBlock);
-            phase = Phase.generating;
-        } else if (phase == Phase.generating) {
-            RN = RNGenerator.getUncorrelatedRN(RNBlock);
-            require(RN != 0, "Random number is not ready yet.");
             phase = Phase.drawing;
         } else if (phase == Phase.drawing) {
             require(disputesWithoutJurors == 0 || now - lastPhaseChange >= maxDrawingTime, "There are still disputes without jurors and the maximum drawing time has not passed yet.");
@@ -461,28 +453,28 @@ contract KlerosLiquid is TokenController, Arbitrator {
         uint _disputeID,
         uint _iterations
     ) external onlyDuringPhase(Phase.drawing) onlyDuringPeriod(_disputeID, Period.evidence) {
-        Dispute storage dispute = disputes[_disputeID];
-        uint endIndex = dispute.drawsInRound + _iterations;
-        require(endIndex >= dispute.drawsInRound);
+        // Dispute storage dispute = disputes[_disputeID];
+        // uint endIndex = dispute.drawsInRound + _iterations;
+        // require(endIndex >= dispute.drawsInRound);
 
-        // Avoid going out of range.
-        if (endIndex > dispute.votes[dispute.votes.length - 1].length) endIndex = dispute.votes[dispute.votes.length - 1].length;
-        for (uint i = dispute.drawsInRound; i < endIndex; i++) {
-            // Draw from sortition tree.
-            (
-                address drawnAddress,
-                uint subcourtID
-            ) = stakePathIDToAccountAndSubcourtID(sortitionSumTrees.draw(bytes32(dispute.subcourtID), uint(keccak256(RN, _disputeID, i))));
+        // // Avoid going out of range.
+        // if (endIndex > dispute.votes[dispute.votes.length - 1].length) endIndex = dispute.votes[dispute.votes.length - 1].length;
+        // for (uint i = dispute.drawsInRound; i < endIndex; i++) {
+        //     // Draw from sortition tree.
+        //     (
+        //         address drawnAddress,
+        //         uint subcourtID
+        //     ) = stakePathIDToAccountAndSubcourtID(sortitionSumTrees.draw(bytes32(dispute.subcourtID), uint(keccak256(RN, _disputeID, i))));
 
-            // Save the vote.
-            dispute.votes[dispute.votes.length - 1][i].account = drawnAddress;
-            jurors[drawnAddress].lockedTokens += dispute.tokensAtStakePerJuror[dispute.tokensAtStakePerJuror.length - 1];
-            emit Draw(drawnAddress, _disputeID, dispute.votes.length - 1, i);
+        //     // Save the vote.
+        //     dispute.votes[dispute.votes.length - 1][i].account = drawnAddress;
+        //     jurors[drawnAddress].lockedTokens += dispute.tokensAtStakePerJuror[dispute.tokensAtStakePerJuror.length - 1];
+        //     emit Draw(drawnAddress, _disputeID, dispute.votes.length - 1, i);
 
-            // If dispute is fully drawn.
-            if (i == dispute.votes[dispute.votes.length - 1].length - 1) disputesWithoutJurors--;
-        }
-        dispute.drawsInRound = endIndex;
+        //     // If dispute is fully drawn.
+        //     if (i == dispute.votes[dispute.votes.length - 1].length - 1) disputesWithoutJurors--;
+        // }
+        // dispute.drawsInRound = endIndex;
     }
 
     /** @dev Sets the caller's commit for the specified votes.
