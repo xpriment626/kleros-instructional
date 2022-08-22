@@ -13,8 +13,6 @@ pragma solidity ^0.4.24;
 import { TokenController } from "minimetoken/contracts/TokenController.sol";
 import { Arbitrator, Arbitrable } from "@kleros/kleros-interaction/contracts/standard/arbitration/Arbitrator.sol";
 import { MiniMeTokenERC20 as Pinakion } from "@kleros/kleros-interaction/contracts/standard/arbitration/ArbitrableTokens/MiniMeTokenERC20.sol";
-import { RNG } from "@kleros/kleros-interaction/contracts/standard/rng/RNG.sol";
-
 import { SortitionSumTreeFactory } from "../data-structures/SortitionSumTreeFactory.sol";
 
 /**
@@ -151,14 +149,11 @@ contract KlerosLiquid is TokenController, Arbitrator {
     // General Contracts
     address public governor; // The governor of the contract.
     Pinakion public pinakion; // The Pinakion token contract.
-    RNG public RNGenerator; // The random number generator contract.
     // General Dynamic
     Phase public phase; // The current phase.
     uint public lastPhaseChange; // The last time the phase was changed.
     uint public disputesWithoutJurors; // The number of disputes that have not finished drawing jurors.
     // The block number to get the next random number from. Used so there is at least a 1 block difference from the staking phase.
-    uint public RNBlock;
-    uint public RN; // The current random number.
     uint public minStakingTime; // The minimum staking time.
     uint public maxDrawingTime; // The maximum drawing time.
     // True if insolvent (`balance < stakedTokens || balance < lockedTokens`) token transfers should be blocked. Used to avoid blocking penalties.
@@ -214,7 +209,6 @@ contract KlerosLiquid is TokenController, Arbitrator {
     constructor(
         address _governor,
         Pinakion _pinakion,
-        RNG _RNGenerator,
         uint _minStakingTime,
         uint _maxDrawingTime,
         bool _hiddenVotes,
@@ -228,7 +222,6 @@ contract KlerosLiquid is TokenController, Arbitrator {
         // Initialize contract.
         governor = _governor;
         pinakion = _pinakion;
-        RNGenerator = _RNGenerator;
         minStakingTime = _minStakingTime;
         maxDrawingTime = _maxDrawingTime;
         lastPhaseChange = now;
@@ -270,17 +263,6 @@ contract KlerosLiquid is TokenController, Arbitrator {
      */
     function changePinakion(Pinakion _pinakion) external onlyByGovernor {
         pinakion = _pinakion;
-    }
-
-    /** @dev Changes the `RNGenerator` storage variable.
-     *  @param _RNGenerator The new value for the `RNGenerator` storage variable.
-     */
-    function changeRNGenerator(RNG _RNGenerator) external onlyByGovernor {
-        RNGenerator = _RNGenerator;
-        if (phase == Phase.generating) {
-            RNBlock = block.number + 1;
-            RNGenerator.requestRN(RNBlock);
-        }
     }
 
     /** @dev Changes the `minStakingTime` storage variable.
